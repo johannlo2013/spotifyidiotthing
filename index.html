@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Car Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #login-container {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #start-btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #start-btn:hover {
+            background: #1ed760;
+        }
+
+        #player-interface {
+            display: none;
+            width: 480px;
+            height: 360px;
+            background: #121212;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        #album-art {
+            width: 200px;
+            height: 200px;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #282828;
+            border-radius: 8px;
+        }
+
+        #track-info {
+            position: absolute;
+            top: 20px;
+            left: 240px;
+            right: 20px;
+        }
+
+        #track-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #artist-name {
+            font-size: 18px;
+            color: #b3b3b3;
+            margin-bottom: 20px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #progress-container {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            right: 20px;
+        }
+
+        #progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #404040;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        #progress {
+            position: absolute;
+            height: 100%;
+            background: #1DB954;
+            border-radius: 2px;
+            width: 0;
+        }
+
+        #time-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 14px;
+            color: #b3b3b3;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .control-btn:hover {
+            background: #282828;
+        }
+
+        #play-pause {
+            width: 60px;
+            height: 60px;
+            background: #1DB954;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #play-pause:hover {
+            background: #1ed760;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-container">
+        <button id="start-btn">Start</button>
+    </div>
+
+    <div id="player-interface">
+        <div id="album-art"></div>
+        <div id="track-info">
+            <div id="track-name">Track Name</div>
+            <div id="artist-name">Artist Name</div>
+        </div>
+        <div id="progress-container">
+            <div id="progress-bar">
+                <div id="progress"></div>
+            </div>
+            <div id="time-info">
+                <span id="current-time">0:00</span>
+                <span id="duration">0:00</span>
+            </div>
+        </div>
+        <div id="controls">
+            <button class="control-btn" id="prev">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                    <line x1="5" y1="19" x2="5" y2="5"></line>
+                </svg>
+            </button>
+            <button class="control-btn" id="play-pause">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </button>
+            <button class="control-btn" id="next">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                    <line x1="19" y1="5" x2="19" y2="19"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Replace these with your Spotify Developer credentials
+        const clientId = 'YOUR_CLIENT_ID';
+        const redirectUri = 'YOUR_REDIRECT_URI';
+
+        // Spotify API endpoints
+        const authEndpoint = 'https://accounts.spotify.com/authorize';
+        const tokenEndpoint = 'https://accounts.spotify.com/api/token';
+        
+        // Required scopes for the application
+        const scopes = [
+            'user-read-playback-state',
+            'user-modify-playback-state',
+            'user-read-currently-playing'
+        ];
+
+        // Start button click handler
+        document.getElementById('start-btn').addEventListener('click', () => {
+            const authUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&response_type=code`;
+            window.location.href = authUrl;
+        });
+
+        // Handle redirect from Spotify
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        if (code) {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('player-interface').style.display = 'block';
+            
+            // Request goes into full screen
+            document.documentElement.requestFullscreen().catch(console.error);
+
+            // Here you would implement the token exchange and Spotify Web Playback SDK
+            // This requires server-side implementation for the token exchange
+            // After getting the access token, you would initialize the Spotify Web Playback SDK
+            
+            let isPlaying = false;
+            const playPauseBtn = document.getElementById('play-pause');
+            const progressBar = document.getElementById('progress');
+            
+            // Play/Pause button click handler
+            playPauseBtn.addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                playPauseBtn.innerHTML = isPlaying ? 
+                    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' :
+                    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+            });
+
+            // Simulate progress bar movement (replace with actual Spotify playback progress)
+            let progress = 0;
+            setInterval(() => {
+                if (isPlaying && progress < 100) {
+                    progress += 0.1;
+                    progressBar.style.width = `${progress}%`;
+                    
+                    const currentTime = Math.floor(progress * 0.03 * 60);
+                    const minutes = Math.floor(currentTime / 60);
+                    const seconds = Math.floor(currentTime % 60);
+                    document.getElementById('current-time').textContent = 
+                        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>
