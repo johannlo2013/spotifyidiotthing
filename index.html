@@ -341,6 +341,7 @@
                 isPlaying = !isPlaying;
                 updatePlayIcon();
                 startProgressInterval();
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
             } catch (error) {
                 console.error('Error toggling playback:', error);
             }
