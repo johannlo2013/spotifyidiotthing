@@ -4,71 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spotify Car Interface</title>
+    <!-- Move the Spotify SDK script after our initialization -->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
-            color: #fff;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #login-container, #fullscreen-prompt {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-        }
-
-        #start-btn, #fullscreen-btn {
-            padding: 15px 30px;
-            font-size: 18px;
-            background: #1DB954;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        #start-btn:hover, #fullscreen-btn:hover {
-            background: #1ed760;
-        }
-
-        #debug-log {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            max-width: 80%;
-            max-height: 100px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        #player-interface {
-            display: none;
-            width: 480px;
-            height: 360px;
-            background: #121212;
-            position: relative;
-            margin: 0 auto;
-        }
-
-        /* ... (rest of the CSS remains the same as before) ... */
+        /* ... (previous CSS remains the same) ... */
     </style>
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </head>
 <body>
     <div id="login-container">
@@ -82,10 +21,23 @@
     </div>
 
     <div id="player-interface">
-        <!-- ... (same player interface HTML as before) ... -->
+        <!-- ... (previous player interface HTML remains the same) ... -->
     </div>
 
     <div id="debug-log"></div>
+
+    <script>
+        // First, define the callback that SDK will look for
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            debugLog('Spotify SDK is ready');
+            if (window.initializeAfterSDKReady) {
+                window.initializeAfterSDKReady();
+            }
+        };
+    </script>
+
+    <!-- Load the Spotify SDK after defining the callback -->
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
 
     <script>
         // Replace these with your Spotify Developer credentials
@@ -99,6 +51,7 @@
             debugElement.style.display = 'block';
             debugElement.innerHTML += `${new Date().toLocaleTimeString()}: ${message}<br>`;
             debugElement.scrollTop = debugElement.scrollHeight;
+            console.log(message); // Also log to console for debugging
         }
 
         // Spotify API endpoints
@@ -116,6 +69,7 @@
 
         // Handle token exchange
         async function getToken(code) {
+            debugLog('Attempting to get token...');
             const basic = btoa(`${clientId}:${clientSecret}`);
             try {
                 const response = await fetch(tokenEndpoint, {
@@ -146,50 +100,67 @@
 
         // Initialize Spotify Web Playback SDK
         function initializePlayer(token) {
+            debugLog('Initializing player...');
             return new Promise((resolve, reject) => {
-                window.onSpotifyWebPlaybackSDKReady = () => {
-                    player = new Spotify.Player({
-                        name: 'Car Thing Interface',
-                        getOAuthToken: cb => cb(token)
-                    });
+                if (!window.Spotify) {
+                    reject(new Error('Spotify SDK not loaded'));
+                    return;
+                }
 
-                    // Error handling
-                    player.addListener('initialization_error', ({ message }) => {
-                        debugLog(`Initialization error: ${message}`);
-                        reject(message);
-                    });
+                player = new Spotify.Player({
+                    name: 'Car Thing Interface',
+                    getOAuthToken: cb => cb(token)
+                });
 
-                    player.addListener('authentication_error', ({ message }) => {
-                        debugLog(`Authentication error: ${message}`);
-                        reject(message);
-                    });
+                // Error handling
+                player.addListener('initialization_error', ({ message }) => {
+                    debugLog(`Initialization error: ${message}`);
+                    reject(message);
+                });
 
-                    player.addListener('account_error', ({ message }) => {
-                        debugLog(`Account error: ${message}`);
-                        reject(message);
-                    });
+                player.addListener('authentication_error', ({ message }) => {
+                    debugLog(`Authentication error: ${message}`);
+                    reject(message);
+                });
 
-                    // Playback status updates
-                    player.addListener('player_state_changed', state => {
-                        if (state) {
-                            updatePlayerInterface(state);
-                        }
-                    });
+                player.addListener('account_error', ({ message }) => {
+                    debugLog(`Account error: ${message}`);
+                    reject(message);
+                });
 
-                    // Ready
-                    player.addListener('ready', ({ device_id }) => {
-                        debugLog('Player ready with device ID: ' + device_id);
-                        resolve(device_id);
-                    });
+                // Playback status updates
+                player.addListener('player_state_changed', state => {
+                    if (state) {
+                        updatePlayerInterface(state);
+                    }
+                });
 
-                    // Connect to the player
-                    player.connect();
-                };
+                // Ready
+                player.addListener('ready', ({ device_id }) => {
+                    debugLog('Player ready with device ID: ' + device_id);
+                    resolve(device_id);
+                });
+
+                // Not Ready
+                player.addListener('not_ready', ({ device_id }) => {
+                    debugLog('Device ID has gone offline: ' + device_id);
+                });
+
+                // Connect to the player
+                player.connect()
+                    .then(success => {
+                        debugLog(`Player connected: ${success}`);
+                    })
+                    .catch(error => {
+                        debugLog(`Player connection error: ${error}`);
+                        reject(error);
+                    });
             });
         }
 
         // Update player interface
         function updatePlayerInterface(state) {
+            debugLog('Updating player interface...');
             if (!state) return;
 
             const {
@@ -204,8 +175,11 @@
             document.getElementById('artist-name').textContent = current_track.artists[0].name;
             
             // Update album art
-            document.getElementById('album-art').style.backgroundImage = `url(${current_track.album.images[0].url})`;
-            document.getElementById('album-art').style.backgroundSize = 'cover';
+            if (current_track.album.images && current_track.album.images[0]) {
+                document.getElementById('album-art').style.backgroundImage = 
+                    `url(${current_track.album.images[0].url})`;
+                document.getElementById('album-art').style.backgroundSize = 'cover';
+            }
 
             // Update play/pause button
             const playPauseBtn = document.getElementById('play-pause');
@@ -230,59 +204,81 @@
 
         // Start button click handler
         document.getElementById('start-btn').addEventListener('click', () => {
+            debugLog('Start button clicked');
             const authUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&response_type=code`;
             window.location.href = authUrl;
         });
 
-        // Fullscreen button click handler
-        document.getElementById('fullscreen-btn').addEventListener('click', async () => {
-            try {
-                await document.documentElement.requestFullscreen();
-                document.getElementById('fullscreen-prompt').style.display = 'none';
-                document.getElementById('player-interface').style.display = 'block';
-                debugLog('Entered fullscreen mode');
-            } catch (error) {
-                debugLog(`Fullscreen error: ${error.message}`);
-            }
-        });
-
-        // Handle redirect and initialize player
+        // Initialize after authentication
         async function initialize() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
 
             if (code) {
-                try {
-                    document.getElementById('login-container').style.display = 'none';
-                    debugLog('Authentication code received');
+                debugLog('Authentication code received');
+                document.getElementById('login-container').style.display = 'none';
 
+                try {
                     accessToken = await getToken(code);
                     debugLog('Access token obtained');
 
-                    const deviceId = await initializePlayer(accessToken);
-                    debugLog('Player initialized');
+                    // Store the initialization function
+                    window.initializeAfterSDKReady = async () => {
+                        try {
+                            const deviceId = await initializePlayer(accessToken);
+                            debugLog('Player initialized successfully');
+                            
+                            // Show fullscreen prompt
+                            document.getElementById('fullscreen-prompt').style.display = 'flex';
 
-                    // Show fullscreen prompt
-                    document.getElementById('fullscreen-prompt').style.display = 'flex';
+                            // Set up control buttons
+                            setupControlButtons();
+                        } catch (error) {
+                            debugLog(`Player initialization error: ${error.message}`);
+                        }
+                    };
 
-                    // Set up control buttons
-                    document.getElementById('play-pause').addEventListener('click', () => {
-                        player.togglePlay();
-                    });
-
-                    document.getElementById('prev').addEventListener('click', () => {
-                        player.previousTrack();
-                    });
-
-                    document.getElementById('next').addEventListener('click', () => {
-                        player.nextTrack();
-                    });
+                    // If SDK is already ready, initialize immediately
+                    if (window.Spotify) {
+                        window.initializeAfterSDKReady();
+                    }
 
                 } catch (error) {
                     debugLog(`Initialization error: ${error.message}`);
                     document.getElementById('login-status').textContent = `Error: ${error.message}`;
                 }
             }
+        }
+
+        function setupControlButtons() {
+            document.getElementById('play-pause').addEventListener('click', () => {
+                if (player) {
+                    player.togglePlay();
+                }
+            });
+
+            document.getElementById('prev').addEventListener('click', () => {
+                if (player) {
+                    player.previousTrack();
+                }
+            });
+
+            document.getElementById('next').addEventListener('click', () => {
+                if (player) {
+                    player.nextTrack();
+                }
+            });
+
+            document.getElementById('fullscreen-btn').addEventListener('click', async () => {
+                try {
+                    await document.documentElement.requestFullscreen();
+                    document.getElementById('fullscreen-prompt').style.display = 'none';
+                    document.getElementById('player-interface').style.display = 'block';
+                    debugLog('Entered fullscreen mode');
+                } catch (error) {
+                    debugLog(`Fullscreen error: ${error.message}`);
+                }
+            });
         }
 
         // Start initialization
