@@ -3,6 +3,7 @@
 <head>
     <title>Spotify Car Interface</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/feather-icons"></script>
     <style>
         * {
             margin: 0;
@@ -30,6 +31,9 @@
             border-radius: 2rem;
             cursor: pointer;
             transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         #startButton:hover {
@@ -105,7 +109,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            padding: 0;
         }
 
         .control-button:hover {
@@ -118,10 +122,23 @@
             color: #b3b3b3;
             font-size: 0.8rem;
         }
+
+        .feather {
+            width: 24px;
+            height: 24px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
     </style>
 </head>
 <body>
-    <button id="startButton">Start Spotify</button>
+    <button id="startButton">
+        <i data-feather="music"></i>
+        Start Spotify
+    </button>
 
     <div id="player">
         <img id="albumArt" src="" alt="Album artwork">
@@ -137,19 +154,29 @@
             <span id="duration">0:00</span>
         </div>
         <div class="controls">
-            <button class="control-button" id="prevButton">⏮</button>
-            <button class="control-button" id="playButton">⏵</button>
-            <button class="control-button" id="nextButton">⏭</button>
+            <button class="control-button" id="prevButton">
+                <i data-feather="skip-back"></i>
+            </button>
+            <button class="control-button" id="playButton">
+                <i data-feather="play"></i>
+            </button>
+            <button class="control-button" id="nextButton">
+                <i data-feather="skip-forward"></i>
+            </button>
         </div>
     </div>
 
     <script>
+        // Initialize Feather Icons
+        feather.replace();
+
         // Replace these with your own Spotify API credentials
         const CLIENT_ID = '193c038b988e474496a09b04f0f8131b';
         const REDIRECT_URI = 'https://spotifyidiotthing.vercel.app';
 
         const startButton = document.getElementById('startButton');
         const player = document.getElementById('player');
+        const playButton = document.getElementById('playButton');
         
         startButton.addEventListener('click', () => {
             const scopes = 'user-read-playback-state user-modify-playback-state';
@@ -182,6 +209,12 @@
                 return `${minutes}:${seconds.toString().padStart(2, '0')}`;
             }
 
+            function updatePlayIcon() {
+                const playIcon = playButton.querySelector('i');
+                playIcon.setAttribute('data-feather', isPlaying ? 'pause' : 'play');
+                feather.replace();
+            }
+
             async function updatePlayerState() {
                 try {
                     const response = await fetch('https://api.spotify.com/v1/me/player', {
@@ -197,7 +230,7 @@
                     document.getElementById('albumArt').src = data.item.album.images[0].url;
                     
                     isPlaying = data.is_playing;
-                    playButton.textContent = isPlaying ? '⏸' : '⏵';
+                    updatePlayIcon();
                     
                     const progressPercent = (data.progress_ms / data.item.duration_ms) * 100;
                     progress.style.width = `${progressPercent}%`;
@@ -216,6 +249,8 @@
                         method: 'PUT',
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
+                    isPlaying = !isPlaying;
+                    updatePlayIcon();
                     updatePlayerState();
                 } catch (error) {
                     console.error('Error toggling playback:', error);
