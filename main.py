@@ -3,14 +3,18 @@ from tkinter import messagebox
 import requests
 from PIL import Image, ImageTk
 import threading
-import json
-import time
+import webbrowser
+from io import BytesIO
 
 # Spotify API credentials
 CLIENT_ID = '193c038b988e474496a09b04f0f8131b'
 CLIENT_SECRET = '7fd55f0965da4c1caf838b9fa4dae541'
 REDIRECT_URI = 'http://localhost:8888/callback'
-AUTH_URL = 'https://accounts.spotify.com/api/token'
+AUTH_URL = 'https://accounts.spotify.com/authorize'
+TOKEN_URL = 'https://accounts.spotify.com/api/token'
+
+# Scopes for controlling playback
+SCOPE = 'user-library-read user-modify-playback-state user-read-playback-state'
 
 # Spotify Web API URLs
 BASE_URL = 'https://api.spotify.com/v1'
@@ -18,63 +22,97 @@ CURRENT_PLAYBACK_URL = BASE_URL + '/me/player/currently-playing'
 NEXT_TRACK_URL = BASE_URL + '/me/player/next'
 PREVIOUS_TRACK_URL = BASE_URL + '/me/player/previous'
 
-# OAuth authentication and get access token
-def get_access_token():
+# Variables for track info and playback state
+current_track = {"title": "Demo Track", "album_art": None}
+access_token = None
+
+
+# Step 1: Authorize the user and get the authorization code
+def get_authorization_url():
+    auth_url = f'{AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope={SCOPE}'
+    return auth_url
+
+
+# Step 2: Exchange the authorization code for an access token
+def get_access_token(auth_code):
     data = {
-        'grant_type': 'client_credentials',
+        'grant_type': 'authorization_code',
+        'code': auth_code,
+        'redirect_uri': REDIRECT_URI,
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET
     }
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-    response = requests.post(AUTH_URL, data=data, headers=headers)
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    response = requests.post(TOKEN_URL, data=data, headers=headers)
+
     if response.status_code == 200:
-        return response.json()['access_token']
+        tokens = response.json()
+        return tokens['access_token']
     else:
         messagebox.showerror("Authentication Error", "Failed to authenticate with Spotify API.")
         return None
 
+
 # Function to fetch current playback info from Spotify API
 def get_current_playback():
-    access_token = get_access_token()
-    if access_token:
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-        response = requests.get(CURRENT_PLAYBACK_URL, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            messagebox.showerror("Error", "Error fetching playback information from Spotify.")
-            return None
-    return None
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get(CURRENT_PLAYBACK_URL, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        messagebox.showerror("Error", "Error fetching playback information from Spotify.")
+        return None
+
 
 # Function to skip to the next track
 def next_track():
-    access_token = get_access_token()
-    if access_token:
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-        response = requests.post(NEXT_TRACK_URL, headers=headers)
-        if response.status_code != 204:
-            messagebox.showerror("Error", "Error skipping to next track.")
-        else:
-            update_current_track_info()
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.post(NEXT_TRACK_URL, headers=headers)
+    
+    if response.status_code == 204:
+        update_current_track_info()
+    else:
+        messagebox.showerror("Error", "Error skipping to next track.")
+
 
 # Function to go to the previous track
 def previous_track():
-    access_token = get_access_token()
-    if access_token:
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-        response = requests.post(PREVIOUS_TRACK_URL, headers=headers)
-        if response.status_code != 204:
-            messagebox.showerror("Error", "Error skipping to previous track.")
-        else:
-            update_current_track_info()
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.post(PREVIOUS_TRACK_URL, headers=headers)
+    
+    if response.status_code == 204:
+        update_current_track_info()
+    else:
+        messagebox.showerror("Error", "Error skipping to previous track.")
+
+
+# Function to start or pause playback
+def toggle_play_pause():
+    current_playback = get_current_playback()
+    if current_playback and current_playback.get('is_playing'):
+        pause_playback()
+    else:
+        start_playback()
+
+
+# Function to pause playback
+def pause_playback():
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.put(f'{BASE_URL}/me/player/pause', headers=headers)
+    
+    if response.status_code == 204:
+        play_pause_button.config(image=play_icon)
+
+
+# Function to start playback
+def start_playback():
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.put(f'{BASE_URL}/me/player/play', headers=headers)
+    
+    if response.status_code == 204:
+        play_pause_button.config(image=pause_icon)
+
 
 # Function to update current track info
 def update_current_track_info():
@@ -86,6 +124,24 @@ def update_current_track_info():
         current_track['album_art'] = album_image_url
         update_ui()
 
+
+# Function to update the UI
+def update_ui():
+    track_label.config(text=f"{current_track['title']}")
+    if current_track["album_art"]:
+        fetch_album_art()
+    
+    current_playback = get_current_playback()
+    if current_playback and current_playback.get('progress_ms') is not None:
+        timestamp = format_timestamp(current_playback['progress_ms'])
+        timestamp_label.config(text=f"Time: {timestamp}")
+
+        progress_ms = current_playback['progress_ms']
+        total_ms = current_playback['item']['duration_ms']
+        progress_ratio = progress_ms / total_ms
+        update_progress(progress_ratio)
+
+
 # Format the timestamp (milliseconds to minutes:seconds)
 def format_timestamp(ms):
     seconds = ms // 1000
@@ -93,24 +149,17 @@ def format_timestamp(ms):
     seconds = seconds % 60
     return f"{minutes:02}:{seconds:02}"
 
-# Update track info and UI based on the current track
-def update_ui():
-    track_label.config(text=f"{current_track['title']}")
-    if current_track["album_art"]:
-        fetch_album_art()
 
-    current_playback = get_current_playback()
-    if current_playback and current_playback.get('progress_ms') is not None:
-        timestamp = format_timestamp(current_playback['progress_ms'])
-        timestamp_label.config(text=f"Time: {timestamp}")
-        
-        progress_ms = current_playback['progress_ms']
-        total_ms = current_playback['item']['duration_ms']
-        progress_ratio = progress_ms / total_ms
-        update_progress(progress_ratio)
+# Update progress bar and circular indicator
+def update_progress(progress_ratio):
+    progress_bar.coords(progress_line, 50, 250, 50 + (400 * progress_ratio), 250)
+    progress_bar.coords(progress_dot, 50 + (400 * progress_ratio) - 8, 242, 50 + (400 * progress_ratio) + 8, 258)
 
+
+# Threaded function to fetch album art
 def fetch_album_art():
     threading.Thread(target=download_and_update_image).start()
+
 
 def download_and_update_image():
     try:
@@ -120,45 +169,12 @@ def download_and_update_image():
         image = image.resize((120, 120))  # Resize image to fit the UI
         album_art = ImageTk.PhotoImage(image)
 
-        # Only update album art if it has changed
         if not hasattr(album_art_label, "image") or album_art_label.image != album_art:
             album_art_label.config(image=album_art)
             album_art_label.image = album_art  # Keep a reference to prevent garbage collection
     except Exception as e:
         print(f"Error fetching album art: {e}")
 
-# Update progress bar and circular indicator
-def update_progress(progress_ratio):
-    progress_bar.coords(progress_line, 50, 250, 50 + (400 * progress_ratio), 250)
-    progress_bar.coords(progress_dot, 50 + (400 * progress_ratio) - 8, 242, 50 + (400 * progress_ratio) + 8, 258)
-
-# Play/Pause function
-def toggle_play_pause():
-    current_playback = get_current_playback()
-    if current_playback and current_playback['is_playing']:
-        pause_playback()
-    else:
-        start_playback()
-
-def pause_playback():
-    access_token = get_access_token()
-    if access_token:
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-        response = requests.put(f'{BASE_URL}/me/player/pause', headers=headers)
-        if response.status_code == 204:
-            play_pause_button.config(image=play_icon)
-
-def start_playback():
-    access_token = get_access_token()
-    if access_token:
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-        response = requests.put(f'{BASE_URL}/me/player/play', headers=headers)
-        if response.status_code == 204:
-            play_pause_button.config(image=pause_icon)
 
 # Create UI elements
 root = tk.Tk()
@@ -172,7 +188,7 @@ current_track = {"title": "Demo Track", "album_art": None}
 track_label = tk.Label(root, text=f"{current_track['title']}", font=("Inter", 18), bg="white", fg="black")
 track_label.pack(pady=10)
 
-# Placeholder for album art (replace with actual image if you have one)
+# Placeholder for album art
 album_art_placeholder = ImageTk.PhotoImage(image=Image.new('RGB', (50, 50), color='white'))  # Gray placeholder
 album_art_label = tk.Label(root, image=album_art_placeholder, bg="white")
 album_art_label.pack(pady=10)
@@ -211,10 +227,12 @@ progress_bar.pack()
 progress_line = progress_bar.create_line(50, 250, 50, 250, width=5, fill="green")
 progress_dot = progress_bar.create_oval(50 - 8, 242, 50 + 8, 258, fill="green", outline="green")
 
-# Set up the periodic update (every 1000 ms = 1 second)
+
+# Periodic update (every 500ms)
 def periodic_update():
     update_current_track_info()
     root.after(500, periodic_update)  # Update every 500ms
+
 
 # Start periodic updates
 periodic_update()
