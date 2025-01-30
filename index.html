@@ -170,6 +170,12 @@
             fill: none;
         }
     </style>
+    <script>
+         function GetLocalTime(){
+            return new Date().toLocaleTimeString();
+        }
+        setInterval(function() { document.getElementById("localTime").textContent = GetLocalTime() }, 1000);
+    </script>
 </head>
 <body>
     <button id="startButton">
@@ -178,7 +184,7 @@
     </button>
 
     <div id="player">
-        <br>
+        <p style="text-align: left;" id="localTime"></p>
         <br>
         <br>
         <img id="albumArt" src="" alt="Album artwork">
