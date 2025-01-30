@@ -1,288 +1,255 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spotify Car Interface</title>
-    <!-- Move the Spotify SDK script after our initialization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* ... (previous CSS remains the same) ... */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #121212;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #startButton {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            background: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #startButton:hover {
+            transform: scale(1.05);
+        }
+
+        #player {
+            display: none;
+            width: 480px;
+            height: 360px;
+            background: #282828;
+            border-radius: 1rem;
+            padding: 1rem;
+            position: relative;
+        }
+
+        #albumArt {
+            width: 200px;
+            height: 200px;
+            border-radius: 0.5rem;
+            margin: 0 auto;
+            background: #181818;
+            display: block;
+        }
+
+        .track-info {
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        #trackName {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        #artistName {
+            font-size: 1rem;
+            color: #b3b3b3;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #404040;
+            border-radius: 2px;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .progress {
+            height: 100%;
+            background: #1DB954;
+            border-radius: 2px;
+            width: 0%;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .control-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: #404040;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .control-button:hover {
+            background: #505050;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            color: #b3b3b3;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
-    <div id="login-container">
-        <button id="start-btn">Start</button>
-        <div id="login-status"></div>
-    </div>
+    <button id="startButton">Start Spotify</button>
 
-    <div id="fullscreen-prompt" style="display: none;">
-        <button id="fullscreen-btn">Enter Fullscreen</button>
-        <p>Tap the button above to enter fullscreen mode</p>
+    <div id="player">
+        <img id="albumArt" src="" alt="Album artwork">
+        <div class="track-info">
+            <div id="trackName">Track Name</div>
+            <div id="artistName">Artist Name</div>
+        </div>
+        <div class="progress-bar">
+            <div class="progress"></div>
+        </div>
+        <div class="time-display">
+            <span id="currentTime">0:00</span>
+            <span id="duration">0:00</span>
+        </div>
+        <div class="controls">
+            <button class="control-button" id="prevButton">⏮</button>
+            <button class="control-button" id="playButton">⏵</button>
+            <button class="control-button" id="nextButton">⏭</button>
+        </div>
     </div>
-
-    <div id="player-interface">
-        <!-- ... (previous player interface HTML remains the same) ... -->
-    </div>
-
-    <div id="debug-log"></div>
 
     <script>
-        // First, define the callback that SDK will look for
-        window.onSpotifyWebPlaybackSDKReady = () => {
-            debugLog('Spotify SDK is ready');
-            if (window.initializeAfterSDKReady) {
-                window.initializeAfterSDKReady();
-            }
-        };
-    </script>
+        // Replace these with your own Spotify API credentials
+        const CLIENT_ID = '193c038b988e474496a09b04f0f8131b';
+        const REDIRECT_URI = 'https://spotifyidiotthing.vercel.app';
 
-    <!-- Load the Spotify SDK after defining the callback -->
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
-
-    <script>
-        // Replace these with your Spotify Developer credentials
-        const clientId = '193c038b988e474496a09b04f0f8131b';
-        const clientSecret = '7fd55f0965da4c1caf838b9fa4dae541';
-        const redirectUri = 'https://spotifyidiotthing.vercel.app';
-
-        // Debug logging function
-        function debugLog(message) {
-            const debugElement = document.getElementById('debug-log');
-            debugElement.style.display = 'block';
-            debugElement.innerHTML += `${new Date().toLocaleTimeString()}: ${message}<br>`;
-            debugElement.scrollTop = debugElement.scrollHeight;
-            console.log(message); // Also log to console for debugging
-        }
-
-        // Spotify API endpoints
-        const authEndpoint = 'https://accounts.spotify.com/authorize';
-        const tokenEndpoint = 'https://accounts.spotify.com/api/token';
-        const scopes = [
-            'user-read-playback-state',
-            'user-modify-playback-state',
-            'user-read-currently-playing',
-            'streaming'
-        ];
-
-        let accessToken = null;
-        let player = null;
-
-        // Handle token exchange
-        async function getToken(code) {
-            debugLog('Attempting to get token...');
-            const basic = btoa(`${clientId}:${clientSecret}`);
-            try {
-                const response = await fetch(tokenEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Basic ${basic}`,
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: new URLSearchParams({
-                        grant_type: 'authorization_code',
-                        code: code,
-                        redirect_uri: redirectUri
-                    })
-                });
-
-                const data = await response.json();
-                if (data.access_token) {
-                    debugLog('Token obtained successfully');
-                    return data.access_token;
-                } else {
-                    throw new Error('No access token received');
-                }
-            } catch (error) {
-                debugLog(`Error getting token: ${error.message}`);
-                throw error;
-            }
-        }
-
-        // Initialize Spotify Web Playback SDK
-        function initializePlayer(token) {
-            debugLog('Initializing player...');
-            return new Promise((resolve, reject) => {
-                if (!window.Spotify) {
-                    reject(new Error('Spotify SDK not loaded'));
-                    return;
-                }
-
-                player = new Spotify.Player({
-                    name: 'Car Thing Interface',
-                    getOAuthToken: cb => cb(token)
-                });
-
-                // Error handling
-                player.addListener('initialization_error', ({ message }) => {
-                    debugLog(`Initialization error: ${message}`);
-                    reject(message);
-                });
-
-                player.addListener('authentication_error', ({ message }) => {
-                    debugLog(`Authentication error: ${message}`);
-                    reject(message);
-                });
-
-                player.addListener('account_error', ({ message }) => {
-                    debugLog(`Account error: ${message}`);
-                    reject(message);
-                });
-
-                // Playback status updates
-                player.addListener('player_state_changed', state => {
-                    if (state) {
-                        updatePlayerInterface(state);
-                    }
-                });
-
-                // Ready
-                player.addListener('ready', ({ device_id }) => {
-                    debugLog('Player ready with device ID: ' + device_id);
-                    resolve(device_id);
-                });
-
-                // Not Ready
-                player.addListener('not_ready', ({ device_id }) => {
-                    debugLog('Device ID has gone offline: ' + device_id);
-                });
-
-                // Connect to the player
-                player.connect()
-                    .then(success => {
-                        debugLog(`Player connected: ${success}`);
-                    })
-                    .catch(error => {
-                        debugLog(`Player connection error: ${error}`);
-                        reject(error);
-                    });
-            });
-        }
-
-        // Update player interface
-        function updatePlayerInterface(state) {
-            debugLog('Updating player interface...');
-            if (!state) return;
-
-            const {
-                track_window: { current_track },
-                paused,
-                position,
-                duration
-            } = state;
-
-            // Update track information
-            document.getElementById('track-name').textContent = current_track.name;
-            document.getElementById('artist-name').textContent = current_track.artists[0].name;
-            
-            // Update album art
-            if (current_track.album.images && current_track.album.images[0]) {
-                document.getElementById('album-art').style.backgroundImage = 
-                    `url(${current_track.album.images[0].url})`;
-                document.getElementById('album-art').style.backgroundSize = 'cover';
-            }
-
-            // Update play/pause button
-            const playPauseBtn = document.getElementById('play-pause');
-            playPauseBtn.innerHTML = paused ? 
-                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' :
-                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
-
-            // Update progress bar
-            const progress = (position / duration) * 100;
-            document.getElementById('progress').style.width = `${progress}%`;
-
-            // Update time displays
-            document.getElementById('current-time').textContent = formatTime(position);
-            document.getElementById('duration').textContent = formatTime(duration);
-        }
-
-        function formatTime(ms) {
-            const minutes = Math.floor(ms / 60000);
-            const seconds = Math.floor((ms % 60000) / 1000);
-            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        // Start button click handler
-        document.getElementById('start-btn').addEventListener('click', () => {
-            debugLog('Start button clicked');
-            const authUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&response_type=code`;
+        const startButton = document.getElementById('startButton');
+        const player = document.getElementById('player');
+        
+        startButton.addEventListener('click', () => {
+            const scopes = 'user-read-playback-state user-modify-playback-state';
+            const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scopes)}`;
             window.location.href = authUrl;
         });
 
-        // Initialize after authentication
-        async function initialize() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
+        // Check if we're returning from Spotify auth
+        if (window.location.hash) {
+            const token = window.location.hash.substr(1).split('&')[0].split('=')[1];
+            startButton.style.display = 'none';
+            player.style.display = 'block';
+            document.documentElement.requestFullscreen();
+            initializePlayer(token);
+        }
 
-            if (code) {
-                debugLog('Authentication code received');
-                document.getElementById('login-container').style.display = 'none';
+        function initializePlayer(token) {
+            const playButton = document.getElementById('playButton');
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            const progress = document.querySelector('.progress');
+            const currentTimeDisplay = document.getElementById('currentTime');
+            const durationDisplay = document.getElementById('duration');
 
+            let isPlaying = false;
+
+            function formatTime(ms) {
+                const seconds = Math.floor((ms / 1000) % 60);
+                const minutes = Math.floor((ms / 1000) / 60);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            async function updatePlayerState() {
                 try {
-                    accessToken = await getToken(code);
-                    debugLog('Access token obtained');
-
-                    // Store the initialization function
-                    window.initializeAfterSDKReady = async () => {
-                        try {
-                            const deviceId = await initializePlayer(accessToken);
-                            debugLog('Player initialized successfully');
-                            
-                            // Show fullscreen prompt
-                            document.getElementById('fullscreen-prompt').style.display = 'flex';
-
-                            // Set up control buttons
-                            setupControlButtons();
-                        } catch (error) {
-                            debugLog(`Player initialization error: ${error.message}`);
-                        }
-                    };
-
-                    // If SDK is already ready, initialize immediately
-                    if (window.Spotify) {
-                        window.initializeAfterSDKReady();
-                    }
-
+                    const response = await fetch('https://api.spotify.com/v1/me/player', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (response.status === 204) return;
+                    
+                    const data = await response.json();
+                    
+                    document.getElementById('trackName').textContent = data.item.name;
+                    document.getElementById('artistName').textContent = data.item.artists[0].name;
+                    document.getElementById('albumArt').src = data.item.album.images[0].url;
+                    
+                    isPlaying = data.is_playing;
+                    playButton.textContent = isPlaying ? '⏸' : '⏵';
+                    
+                    const progressPercent = (data.progress_ms / data.item.duration_ms) * 100;
+                    progress.style.width = `${progressPercent}%`;
+                    
+                    currentTimeDisplay.textContent = formatTime(data.progress_ms);
+                    durationDisplay.textContent = formatTime(data.item.duration_ms);
                 } catch (error) {
-                    debugLog(`Initialization error: ${error.message}`);
-                    document.getElementById('login-status').textContent = `Error: ${error.message}`;
+                    console.error('Error updating player state:', error);
                 }
             }
-        }
 
-        function setupControlButtons() {
-            document.getElementById('play-pause').addEventListener('click', () => {
-                if (player) {
-                    player.togglePlay();
-                }
-            });
-
-            document.getElementById('prev').addEventListener('click', () => {
-                if (player) {
-                    player.previousTrack();
-                }
-            });
-
-            document.getElementById('next').addEventListener('click', () => {
-                if (player) {
-                    player.nextTrack();
-                }
-            });
-
-            document.getElementById('fullscreen-btn').addEventListener('click', async () => {
+            playButton.addEventListener('click', async () => {
+                const endpoint = isPlaying ? 'pause' : 'play';
                 try {
-                    await document.documentElement.requestFullscreen();
-                    document.getElementById('fullscreen-prompt').style.display = 'none';
-                    document.getElementById('player-interface').style.display = 'block';
-                    debugLog('Entered fullscreen mode');
+                    await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    updatePlayerState();
                 } catch (error) {
-                    debugLog(`Fullscreen error: ${error.message}`);
+                    console.error('Error toggling playback:', error);
                 }
             });
-        }
 
-        // Start initialization
-        initialize();
+            prevButton.addEventListener('click', async () => {
+                try {
+                    await fetch('https://api.spotify.com/v1/me/player/previous', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    updatePlayerState();
+                } catch (error) {
+                    console.error('Error skipping to previous:', error);
+                }
+            });
+
+            nextButton.addEventListener('click', async () => {
+                try {
+                    await fetch('https://api.spotify.com/v1/me/player/next', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    updatePlayerState();
+                } catch (error) {
+                    console.error('Error skipping to next:', error);
+                }
+            });
+
+            // Update player state every second
+            setInterval(updatePlayerState, 1000);
+            updatePlayerState();
+        }
     </script>
 </body>
 </html>
