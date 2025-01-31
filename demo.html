@@ -5,7 +5,170 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
-        /* ... (previous styles remain the same) ... */
+                * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #121212;
+            color: white;
+            height: 50vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #startButton {
+            padding: 0.5rem 1rem;
+            font-size: 0.6rem;
+            background: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        #startButton:hover {
+            transform: scale(1.05);
+        }
+
+        #player {
+            display: none;
+            width: 240px;
+            height: 180px;
+            background: #121212;
+            border-radius: 1rem;
+            padding: 0.5rem;
+            position: relative;
+        }
+
+        #albumArt {
+            width: 100px;
+            height: 100px;
+            border-radius: 0.5rem;
+            margin: 0 auto;
+            background: #181818;
+            display: block;
+            object-fit: cover;
+        }
+
+        .track-info {
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        #trackName {
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #artistName {
+            font-size: 0.5rem;
+            color: #b3b3b3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-container {
+            margin: 0.5rem 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 2px;
+            background: #404040;
+            border-radius: 2px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .progress {
+            height: 100%;
+            background: #1DB954;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s linear;
+            position: relative;
+        }
+
+        .progress::after {
+            content: '';
+            position: absolute;
+            right: -3px;
+            top: -2px;
+            width: 6px;
+            height: 6px;
+            background: #1DB954;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .progress-bar:hover .progress::after {
+            opacity: 1;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .control-button {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            border: none;
+            background: #404040;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .control-button:hover {
+            background: #505050;
+            transform: scale(0.525);
+        }
+
+        .control-button:active {
+            transform: scale(0.475);
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            color: #b3b3b3;
+            font-size: 0.4rem;
+            margin-top: 0.25rem;
+        }
+
+        .feather {
+            width: 12px;
+            height: 12px;
+            stroke: currentColor;
+            stroke-width: 1;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
 
         .container {
             display: flex;
@@ -97,7 +260,35 @@
 
     <div class="container">
         <div id="player">
-            <!-- ... (previous player content remains the same) ... -->
+            <br>
+            <br>
+            <p style="text-align: center;" id="localTime" class="localTime"></p>
+            <br>
+            <img id="albumArt" src="" alt="Album artwork">
+            <div class="track-info">
+                <div id="trackName">Track Name</div>
+                <div id="artistName">Artist Name</div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="control-button" id="prevButton">
+                    <i data-feather="skip-back"></i>
+                </button>
+                <button class="control-button" id="playButton">
+                    <i data-feather="play"></i>
+                </button>
+                <button class="control-button" id="nextButton">
+                    <i data-feather="skip-forward"></i>
+                </button>
+            </div>
         </div>
         <button id="playlistToggle">
             <i data-feather="list"></i>
@@ -110,10 +301,175 @@
     </div>
 
     <script>
-        // ... (previous script content remains the same until initializePlayer function) ...
+                // Initialize Feather Icons
+                feather.replace();
+
+                // Replace these with your own Spotify API credentials
+                const CLIENT_ID = '193c038b988e474496a09b04f0f8131b';
+                const REDIRECT_URI = 'https://spotipi.thesunbeaming.co';
+
+                const startButton = document.getElementById('startButton');
+                const player = document.getElementById('player');
+
+                startButton.addEventListener('click', () => {
+                    const scopes = 'user-read-playback-state user-modify-playback-state';
+                    const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scopes)}`;
+                    window.location.href = authUrl;
+                });
+
+                // Check if we're returning from Spotify auth
+                if (window.location.hash) {
+                    const token = window.location.hash.substr(1).split('&')[0].split('=')[1];
+                    startButton.style.display = 'none';
+                    player.style.display = 'block';
+                    document.documentElement.requestFullscreen().catch(err => console.log(err));
+                    initializePlayer(token);
+                }
+
 
         function initializePlayer(token) {
-            // ... (previous initializePlayer content remains the same) ...
+            const playButton = document.getElementById('playButton');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+        const progressBar = document.querySelector('.progress-bar');
+        const progress = document.querySelector('.progress');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const durationDisplay = document.getElementById('duration');
+
+        let isPlaying = false;
+        let progressInterval;
+        let currentTrackId = null;
+        let currentProgress = 0;
+        let currentDuration = 0;
+
+        function formatTime(ms) {
+            const seconds = Math.floor((ms / 1000) % 60);
+            const minutes = Math.floor((ms / 1000) / 60);
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function updatePlayIcon() {
+            // First, update the icon element
+            playButton.innerHTML = `<i data-feather="${isPlaying ? 'pause' : 'play'}"></i>`;
+            // Then, replace all icons
+            feather.replace();
+        }
+
+        // Initialize the play button icon immediately
+        updatePlayIcon();
+
+        function startProgressInterval() {
+            clearInterval(progressInterval);
+            if (isPlaying) {
+                progressInterval = setInterval(() => {
+                    if (currentProgress < currentDuration) {
+                        currentProgress += 1000; // Add one second
+                        updateProgressDisplay();
+                    }
+                }, 1000);
+            }
+        }
+
+        function updateProgressDisplay() {
+            const progressPercent = (currentProgress / currentDuration) * 100;
+            progress.style.width = `${progressPercent}%`;
+            currentTimeDisplay.textContent = formatTime(currentProgress);
+        }
+
+        progressBar.addEventListener('click', async (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const clickPosition = (e.clientX - rect.left) / rect.width;
+            const newPosition = Math.floor(currentDuration * clickPosition);
+            
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${newPosition}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                currentProgress = newPosition;
+                updateProgressDisplay();
+            } catch (error) {
+                console.error('Error seeking:', error);
+            }
+        });
+
+        async function updatePlayerState() {
+            try {
+                const response = await fetch('https://api.spotify.com/v1/me/player', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.status === 204) return;
+                
+                const data = await response.json();
+                
+                // Only update everything if the track has changed
+                if (currentTrackId !== data.item.id) {
+                    document.getElementById('trackName').textContent = data.item.name;
+                    document.getElementById('artistName').textContent = data.item.artists[0].name;
+                    document.getElementById('albumArt').src = data.item.album.images[0].url;
+                    currentTrackId = data.item.id;
+                    currentDuration = data.item.duration_ms;
+                    durationDisplay.textContent = formatTime(currentDuration);
+                }
+                
+                if (isPlaying !== data.is_playing) {
+                    isPlaying = data.is_playing;
+                    updatePlayIcon();
+                }
+                
+                currentProgress = data.progress_ms;
+                updateProgressDisplay();
+                startProgressInterval();
+                
+            } catch (error) {
+                console.error('Error updating player state:', error);
+            }
+        }
+
+        playButton.addEventListener('click', async () => {
+            const endpoint = isPlaying ? 'pause' : 'play';
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                isPlaying = !isPlaying;
+                updatePlayIcon();
+                startProgressInterval();
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } catch (error) {
+                console.error('Error toggling playback:', error);
+            }
+        });
+
+        prevButton.addEventListener('click', async () => {
+            try {
+                await fetch('https://api.spotify.com/v1/me/player/previous', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setTimeout(updatePlayerState, 100);
+            } catch (error) {
+                console.error('Error skipping to previous:', error);
+            }
+        });
+
+        nextButton.addEventListener('click', async () => {
+            try {
+                await fetch('https://api.spotify.com/v1/me/player/next', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setTimeout(updatePlayerState, 100);
+            } catch (error) {
+                console.error('Error skipping to next:', error);
+            }
+        });
+
+        // Update player state every 3 seconds
+        setInterval(updatePlayerState, 3000);
+        updatePlayerState();
 
             // Add these new functions for playlist functionality
             const playlistPanel = document.getElementById('playlistPanel');
