@@ -249,7 +249,7 @@
         return new Promise(resolve => setTimeout(resolve, ms));
       }
       setInterval(function() {
-        startButton.innerHTML = "<img src='loading.gif' height='15' width='15'> ONE MOMENT PLEASE "
+        startButton.innerHTML = "<img src='loading.gif' height='15' width='15'> LOAD SPOTIPI "
       }, 5000);
       startButton.addEventListener('click', () => {
         const scopes = 'user-read-playback-state user-modify-playback-state';
