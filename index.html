@@ -248,7 +248,7 @@
       function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
       }
-      sleep(5000)
+      sleep(50000)
       startButton.innerHTML = "<img src='loading.gif' height='15' width='15'> LOAD SPOTIPI PROGRAM "
       startButton.addEventListener('click', () => {
         const scopes = 'user-read-playback-state user-modify-playback-state';
